@@ -108,3 +108,12 @@ InitTestScene*.unity*
 
 #Node
 **/node_modules/
+
+# Unity generated files
+/SH_UnityClient/[Ll]ibrary/
+/SH_UnityClient/[Tt]emp/
+/SH_UnityClient/[Oo]bj/
+/SH_UnityClient/[Ll]ogs/
+/SH_UnityClient/[Uu]ser[Ss]ettings/
+/SH_UnityClient/[Bb]uild/
+/SH_UnityClient/[Bb]uilds/
