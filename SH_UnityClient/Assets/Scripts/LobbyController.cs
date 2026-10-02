@@ -13,14 +13,23 @@ public class LobbyController : MonoBehaviour
     [SerializeField] private RectTransform playerArea;
     [SerializeField] private GameObject playerItemPrefab;
 
+    private SessionController sessionController;
+
     private Dictionary<string, GameObject> players = new();
 
     void Start()
     {
-        Debug.Log("LobbyController started");
-        NetworkManager.instance.RegisterLobbyController(this);
-        
+        var network = NetworkManager.instance;
 
+        network.RegisterLobbyController(this);
+
+        sessionController = network.GetComponent<SessionController>();
+        sessionController.SessionChanged += RefreshLobby;
+
+        if(sessionController.CurrentSession != null)
+        {
+            RefreshLobby(sessionController.CurrentSession);
+        }
     }
 
     public void SetRoomCode(string roomCode)
@@ -79,6 +88,46 @@ public class LobbyController : MonoBehaviour
     public void OnStartClick()
     {
         NetworkManager.instance.StartGame();
+    }
+
+    public void OnBackClick()
+    {
+        NetworkManager.instance.StopGame();
+    }
+
+    private void RefreshLobby(SessionSnapshot snapshot)
+    {
+        if(snapshot.state != "lobby")
+        {
+            return;
+        }
+
+        SetRoomCode(snapshot.roomCode);
+
+        foreach (var playerObject in players.Values) 
+        {
+            Destroy(playerObject);
+        }
+
+        players.Clear();
+
+        if(snapshot.players == null)
+        {
+            return;
+        }
+
+        foreach(var player in snapshot.players)
+        {
+            AddPlayer(player.username);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (sessionController != null)
+        {
+            sessionController.SessionChanged -= RefreshLobby;
+        }
     }
 
 }

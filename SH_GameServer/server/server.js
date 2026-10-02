@@ -14,11 +14,11 @@ app.get('/', (req, res) => {
 
 const RECONNECT_GRACE_MS = 30_000;
 
-function clearRoomSession(session){
+function clearRoomSession(session) {
     clearTimeout(session.disconnectTimer);
-    session.disconnectTimer=null;
-    session.roomCode=null;
-    session.role=null;
+    session.disconnectTimer = null;
+    session.roomCode = null;
+    session.role = null;
 }
 
 io.on('connection', (socket) => {
@@ -78,9 +78,14 @@ io.on('connection', (socket) => {
             return;
         }
         if (!room) {
-            console.log('wrong room code');
+            socket.emit('joinError', "code");
             return;
         };
+
+        if (room.state !== 'lobby') {
+            socket.emit('joinError', 'This game has already started.');
+            return;
+        }
 
         if ((room.players.some((player) => player.PlayerID === socket.id))) {
 
@@ -88,7 +93,7 @@ io.on('connection', (socket) => {
             return;
         }
         else if ((room.players.some((player) => player.username === username))) {
-            console.log("Username taken");
+            socket.emit('joinError', "username");
             return;
         }
 
@@ -124,12 +129,12 @@ io.on('connection', (socket) => {
     });
 
     socket.on('registerSession', (token) => {
-        
+
         token = socket.data.sessionToken || token;
 
-        let session = typeof token === 'string'?sessions.get(token):undefined;
+        let session = typeof token === 'string' ? sessions.get(token) : undefined;
 
-        if(!session){
+        if (!session) {
             token = crypto.randomBytes(32).toString('hex');
 
             session = {
@@ -142,14 +147,14 @@ io.on('connection', (socket) => {
         }
 
         clearTimeout(session.disconnectTimer);
-        session.disconnectTimer=null;
+        session.disconnectTimer = null;
 
         const previousSocketId = session.socketId;
 
         session.socketId = socket.id;
         socket.data.sessionToken = token;
 
-        if (previousSocketId && previousSocketId !== socket.id){
+        if (previousSocketId && previousSocketId !== socket.id) {
             delete roomHosts[previousSocketId];
             io.sockets.sockets.get(previousSocketId)?.disconnect(true);
         }
@@ -178,55 +183,55 @@ io.on('connection', (socket) => {
             if (membershipRestored) {
                 socket.join(roomCode);
             }
-            else{
+            else {
                 clearRoomSession(session);
             }
         }
-        else{
+        else {
             clearRoomSession(session);
         }
 
         socket.emit('sessionReady', token);
 
-        if(session.roomCode){
+        if (session.roomCode) {
             const restoredRoom = rooms[session.roomCode];
 
             socket.emit('sessionRestored', {
                 roomCode: session.roomCode,
                 role: session.role,
                 state: restoredRoom.state,
-                players: restoredRoom.players.map(player=>({username: player.username, score: player.score}))
+                players: restoredRoom.players.map(player => ({ username: player.username, score: player.score }))
             })
         }
     })
 
-    socket.on('disconnect', ()=> {
+    socket.on('disconnect', () => {
         const token = socket.data.sessionToken;
         const session = sessions.get(token);
 
-        if(!session || session.socketId !== socket.id){
+        if (!session || session.socketId !== socket.id) {
             return;
         }
 
         session.socketId = null;
         delete roomHosts[socket.id];
 
-        session.disconnectTimer = setTimeout(()=>{
-            if(sessions.get(token) !== session || session.socketId !== null){
+        session.disconnectTimer = setTimeout(() => {
+            if (sessions.get(token) !== session || session.socketId !== null) {
                 return;
             }
 
             const roomCode = session.roomCode;
             const room = rooms[roomCode];
 
-            if(room && session.role == "host" && room.hostSessionToken === token){
+            if (room && session.role == "host" && room.hostSessionToken === token) {
                 io.to(roomCode).emit('roomClosed');
                 io.in(roomCode).socketsLeave(roomCode);
 
                 delete roomHosts[room.hostID];
                 delete rooms[roomCode];
 
-                for(const [memberToken, member] of sessions){
+                for (const [memberToken, member] of sessions) {
                     if (member.roomCode !== roomCode) {
                         continue;
                     }
@@ -240,7 +245,7 @@ io.on('connection', (socket) => {
 
                 console.log(`Room ${roomCode} closed: host timed out`);
             }
-            else if (room && session.role == "player"){
+            else if (room && session.role == "player") {
                 const player = room.players.find(p => p.sessionToken === token);
 
                 room.players = room.players.filter(p => p.sessionToken !== token);
@@ -259,19 +264,19 @@ io.on('connection', (socket) => {
         if (roomHosts[socket.id]) {
             const roomCode = roomHosts[socket.id];
             console.log("game start button clicked");
-            
+
 
             if (rooms[roomCode].state === 'lobby' && (rooms[roomCode].players.reduce((sum, num) => sum + 1, 0)) >= 2) {
                 rooms[roomCode].state = 'playing';
                 console.log(rooms[roomCode].state);
-                socket.emit(
+                io.to(roomCode).emit(
                     'stateChanged', rooms[roomCode].state
                 );
                 console.log("Sending state Change");
-                
+
                 return;
             }
-            
+
             socket.emit('stateChanged', "Not enough players");
 
         }

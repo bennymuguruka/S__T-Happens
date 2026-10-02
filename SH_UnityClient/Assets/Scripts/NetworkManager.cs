@@ -15,6 +15,7 @@ public class NetworkManager : MonoBehaviour
     public static NetworkManager instance;
     public string stateMessage;
     private string sessionToken = "";
+    public event Action<SessionSnapshot> SessionRestored;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -104,6 +105,11 @@ public class NetworkManager : MonoBehaviour
             Debug.Log("Session Ready");
         });
 
+        socket.OnUnityThread("sessionRestored", response =>
+        {
+            var snapshot = response.GetValue<SessionSnapshot>();
+            SessionRestored?.Invoke(snapshot);
+        });
 
     }
 
@@ -114,6 +120,12 @@ public class NetworkManager : MonoBehaviour
     public void StartGame()
     {
         socket.Emit("startGame");
+    }
+
+    public void StopGame()
+    {
+        socket.Disconnect();
+        SceneManager.LoadScene("Menu");
     }
 
     void Awake()
