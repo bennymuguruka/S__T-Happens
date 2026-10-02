@@ -28,7 +28,7 @@ public class LobbyController : MonoBehaviour
         Debug.Log("SetRoomCode to" + roomCode);
         roomCodeText.text = $"Room Code: \n{roomCode}";
         Debug.Log("Text component now contains: " + roomCodeText.text);
-        string joinUrl = $"http://127.0.0.1:5500/SH_UserClient/test.html?roomCode={roomCode}";
+        string joinUrl = $"http://192.168.0.116:5500/SH_UserClient/client-game.html?roomCode={roomCode}";
 
         GenerateQRCode(joinUrl);
     }

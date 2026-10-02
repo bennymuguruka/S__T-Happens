@@ -14,13 +14,14 @@ public class NetworkManager : MonoBehaviour
     private string roomCode;
     public static NetworkManager instance;
     public string stateMessage;
+    private string sessionToken = "";
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         ConnectToServer();
         Events();
-
+        socket.Connect();
     }
 
     void ConnectToServer()
@@ -43,9 +44,8 @@ public class NetworkManager : MonoBehaviour
         socket.OnConnected += (sender, e) =>
         {
             Debug.Log("Connected");
+            socket.Emit("registerSession", sessionToken);
         };
-
-        socket.Connect();
     }
 
     void Events()
@@ -97,6 +97,14 @@ public class NetworkManager : MonoBehaviour
                 Debug.Log(stateMessage);
             }
         });
+
+        socket.OnUnityThread("sessionReady", response =>
+        {
+            sessionToken = response.GetValue<string>();
+            Debug.Log("Session Ready");
+        });
+
+
     }
 
     public void CreateRoom() {

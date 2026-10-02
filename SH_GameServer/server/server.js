@@ -1,26 +1,55 @@
-//Entry point to app
 const express = require('express');
 var app = express();
 const server = require('http').createServer(app);
 const io = require('socket.io')(server, { cors: { origin: '*' } });
-const { generateRoomCode, rooms, roomHosts, findRoomByHost } = require('./rooms')
+const { generateRoomCode, rooms, roomHosts, findRoomByHost } = require('./rooms');
+const crypto = require('crypto');
+
+const sessions = new Map();
 
 
 app.get('/', (req, res) => {
     res.send("S**T Happens Server Running");
 });
 
+const RECONNECT_GRACE_MS = 30_000;
+
+function clearRoomSession(session){
+    clearTimeout(session.disconnectTimer);
+    session.disconnectTimer=null;
+    session.roomCode=null;
+    session.role=null;
+}
+
 io.on('connection', (socket) => {
 
     socket.on('createRoom', () => {
+        const sessionToken = socket.data.sessionToken;
+        const session = sessions.get(sessionToken);
+
+        if (!session) {
+            socket.emit('sessionError', "Session not ready");
+            return;
+        }
+
+        if (session.roomCode) {
+            socket.emit('sessionError', "Already in a room");
+            return;
+        }
+
+
         if (!(Object.keys(roomHosts).includes(socket.id))) {
             const roomCode = generateRoomCode();
             rooms[roomCode] = {
                 hostID: socket.id,
+                hostSessionToken: sessionToken,
                 players: [],
                 state: 'lobby'
 
             };
+
+            session.roomCode = roomCode;
+            session.role = "host";
 
             roomHosts[socket.id] = roomCode;
             socket.join(roomCode);
@@ -37,27 +66,41 @@ io.on('connection', (socket) => {
 
     socket.on('join room', (roomCode, username) => {
         const room = rooms[roomCode];
+        const sessionToken = socket.data.sessionToken;
+        const session = sessions.get(sessionToken);
+        if (!session) {
+            socket.emit('sessionError', "session not ready");
+            return;
+        }
 
+        if (session.roomCode) {
+            socket.emit('sessionError', "Already in a room");
+            return;
+        }
         if (!room) {
             console.log('wrong room code');
             return;
         };
 
-        if ((room.players.some((player) => room.players.PlayerID == socket.id))) {
+        if ((room.players.some((player) => player.PlayerID === socket.id))) {
 
             console.log("Connection already exists");
             return;
         }
-        else if ((room.players.some((player) => room.players.username == username))) {
+        else if ((room.players.some((player) => player.username === username))) {
             console.log("Username taken");
             return;
         }
 
         room.players.push({
             PlayerID: socket.id,
+            sessionToken,
             username,
             score: 0
-        })
+        });
+
+        session.roomCode = roomCode;
+        session.role = "player";
 
         socket.join(roomCode);
 
@@ -73,43 +116,143 @@ io.on('connection', (socket) => {
             player.username
         );
 
-        io.to(socket.io).emit(
+        socket.emit(
             'playerAdded'
         );
 
 
     });
 
-    socket.on('disconnect', () => {
-        const roomCode = roomHosts[socket.id];
+    socket.on('registerSession', (token) => {
+        
+        token = socket.data.sessionToken || token;
 
-        if (roomCode) {
+        let session = typeof token === 'string'?sessions.get(token):undefined;
 
-            console.log('Host left game: ' + roomCode);
-            delete rooms[roomCode];
-            delete roomHosts[socket.id];
+        if(!session){
+            token = crypto.randomBytes(32).toString('hex');
 
-            socket.emit('roomClosed');
-            return
+            session = {
+                socketID: socket.id,
+                roomCode: null,
+                role: null
+            };
+
+            sessions.set(token, session);
         }
 
-        if (!roomCode || !rooms[roomCode])
+        clearTimeout(session.disconnectTimer);
+        session.disconnectTimer=null;
+
+        const previousSocketId = session.socketId;
+
+        session.socketId = socket.id;
+        socket.data.sessionToken = token;
+
+        if (previousSocketId && previousSocketId !== socket.id){
+            delete roomHosts[previousSocketId];
+            io.sockets.sockets.get(previousSocketId)?.disconnect(true);
+        }
+
+        const roomCode = session.roomCode;
+        const room = rooms[roomCode];
+
+        if (room) {
+            let membershipRestored = false;
+
+            if (session.role == "host" && room.hostSessionToken === token) {
+                delete roomHosts[room.hostID];
+                room.hostID = socket.id;
+                roomHosts[socket.id] = roomCode;
+                membershipRestored = true;
+            }
+            else if (session.role == "player") {
+                const player = room.players.find(p => p.sessionToken === token);
+
+                if (player) {
+                    player.PlayerID = socket.id;
+                    membershipRestored = true;
+                }
+            }
+
+            if (membershipRestored) {
+                socket.join(roomCode);
+            }
+            else{
+                clearRoomSession(session);
+            }
+        }
+        else{
+            clearRoomSession(session);
+        }
+
+        socket.emit('sessionReady', token);
+
+        if(session.roomCode){
+            const restoredRoom = rooms[session.roomCode];
+
+            socket.emit('sessionRestored', {
+                roomCode: session.roomCode,
+                role: session.role,
+                state: restoredRoom.state,
+                players: restoredRoom.players.map(player=>({username: player.username, score: player.score}))
+            })
+        }
+    })
+
+    socket.on('disconnect', ()=> {
+        const token = socket.data.sessionToken;
+        const session = sessions.get(token);
+
+        if(!session || session.socketId !== socket.id){
             return;
+        }
 
-        const player = rooms[roomCode].players.find(
-            p => p.PlayerID === socket.id
-        );
+        session.socketId = null;
+        delete roomHosts[socket.id];
 
-        if (!player)
-            return;
-        io.to(roomCode).emit('playerLeft', player.username);
+        session.disconnectTimer = setTimeout(()=>{
+            if(sessions.get(token) !== session || session.socketId !== null){
+                return;
+            }
 
-        rooms[roomCode].players = rooms[roomCode].players.filter(
-            p => p.PlayerID !== socket.id
-        );
+            const roomCode = session.roomCode;
+            const room = rooms[roomCode];
 
-        console.log(`${player.username} left the game`);
-    });
+            if(room && session.role == "host" && room.hostSessionToken === token){
+                io.to(roomCode).emit('roomClosed');
+                io.in(roomCode).socketsLeave(roomCode);
+
+                delete roomHosts[room.hostID];
+                delete rooms[roomCode];
+
+                for(const [memberToken, member] of sessions){
+                    if (member.roomCode !== roomCode) {
+                        continue;
+                    }
+
+                    clearRoomSession(member);
+
+                    if (member.socketId === null) {
+                        sessions.delete(memberToken);
+                    }
+                }
+
+                console.log(`Room ${roomCode} closed: host timed out`);
+            }
+            else if (room && session.role == "player"){
+                const player = room.players.find(p => p.sessionToken === token);
+
+                room.players = room.players.filter(p => p.sessionToken !== token);
+
+                if (player) {
+                    io.to(roomCode).emit('playerLeft', player.username);
+                }
+            }
+
+            sessions.delete(token);
+        }, RECONNECT_GRACE_MS);
+    })
 
 
     socket.on("startGame", () => {
