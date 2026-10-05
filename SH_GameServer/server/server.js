@@ -21,6 +21,34 @@ function clearRoomSession(session) {
     session.role = null;
 }
 
+function closeRoom(roomCode) {
+    const room = rooms[roomCode];
+    if (!room) {
+        return;
+    }
+
+    delete roomHosts[room.hostID];
+    delete rooms[roomCode];
+
+    for (const [token, session] of sessions) {
+        if (session.roomCode != roomCode) {
+            continue;
+        }
+
+        clearRoomSession(session);
+
+        if (session.socketId === null) {
+            sessions.delete(token);
+        }
+        else{
+            io.to(session.socketId).emit("sessionReset");
+        }
+    }
+
+    io.to(roomCode).emit("roomClosed");
+    io.in(roomCode).socketsLeave(roomCode);
+}
+
 io.on('connection', (socket) => {
 
     socket.on('createRoom', () => {
@@ -84,6 +112,18 @@ io.on('connection', (socket) => {
 
         if (room.state !== 'lobby') {
             socket.emit('joinError', 'This game has already started.');
+            return;
+        }
+
+        if(typeof username !== "string"){
+            socket.emit("joinError", 'Enter a valid username.');
+            return;
+        }
+
+        username = username.trim();
+
+        if(username.length < 1 || username.length> 20){
+            socket.emit('joinError', 'Username must be between 1 and 20 characters.');
             return;
         }
 
@@ -203,6 +243,9 @@ io.on('connection', (socket) => {
                 players: restoredRoom.players.map(player => ({ username: player.username, score: player.score }))
             })
         }
+        else{
+            socket.emit('sessionReset');
+        }
     })
 
     socket.on('disconnect', () => {
@@ -225,25 +268,9 @@ io.on('connection', (socket) => {
             const room = rooms[roomCode];
 
             if (room && session.role == "host" && room.hostSessionToken === token) {
-                io.to(roomCode).emit('roomClosed');
-                io.in(roomCode).socketsLeave(roomCode);
-
-                delete roomHosts[room.hostID];
-                delete rooms[roomCode];
-
-                for (const [memberToken, member] of sessions) {
-                    if (member.roomCode !== roomCode) {
-                        continue;
-                    }
-
-                    clearRoomSession(member);
-
-                    if (member.socketId === null) {
-                        sessions.delete(memberToken);
-                    }
-                }
-
+                closeRoom(roomCode);
                 console.log(`Room ${roomCode} closed: host timed out`);
+                
             }
             else if (room && session.role == "player") {
                 const player = room.players.find(p => p.sessionToken === token);
@@ -280,6 +307,45 @@ io.on('connection', (socket) => {
             socket.emit('stateChanged', "Not enough players");
 
         }
+    });
+
+    socket.on("leaveRoom", ()=>{
+        const token = socket.data.sessionToken;
+        const session = sessions.get(token);
+
+        if (!session || session.socketId !== socket.id) {
+            socket.emit("sessionError", "Session not ready");
+            return;
+        }
+
+        const roomCode = session.roomCode;
+        const room = rooms[roomCode];
+
+        if(room && session.role === "host" && room.hostSessionToken === token){
+            closeRoom(roomCode);
+            return;
+        }
+
+        if (roomCode) {
+            socket.leave(roomCode);
+        }
+
+        if (room && session.role === "player") {
+            const player = room.players.find(
+                p => p.sessionToken === token
+            );
+
+            room.players = room.players.filter(
+                p => p.sessionToken !== token
+            );
+
+            if (player) {
+                io.to(roomCode).emit("playerLeft", player.username);
+            }
+        }
+
+        clearRoomSession(session);
+        socket.emit("sessionReset");
     })
 
     console.log("Connection established")

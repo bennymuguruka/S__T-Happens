@@ -33,6 +33,13 @@ socket.on('roomClosed', () => {
     renderRoomState('closed');
 })
 
+socket.on('sessionReset', ()=>{
+    document.getElementById("Join").hidden = false;
+    document.getElementById("statusMessage").textContent = "";
+    document.getElementById("codeError").textContent = "";
+    document.getElementById("usernameError").textContent = "";
+})
+
 //Join Page
     const form = document.querySelector("#joinForm");
     form.addEventListener('submit', (event)=> {

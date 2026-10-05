@@ -11,11 +11,13 @@ public class SessionController : MonoBehaviour
     private void OnEnable()
     {
         networkManager.SessionRestored += HandleSessionRestored;
+        networkManager.SessionReset += HandleSessionReset;
     }
 
     private void OnDisable()
     {
         networkManager.SessionRestored -= HandleSessionRestored;
+        networkManager.SessionReset -= HandleSessionReset;
     }
 
     private void HandleSessionRestored(SessionSnapshot snapshot)
@@ -47,6 +49,16 @@ public class SessionController : MonoBehaviour
             SessionChanged?.Invoke(snapshot);
         }
         
+    }
+
+    private void HandleSessionReset()
+    {
+        CurrentSession = null;
+
+        if(SceneManager.GetActiveScene().name != "Menu")
+        {
+            SceneManager.LoadScene("Menu");
+        }
     }
 
 

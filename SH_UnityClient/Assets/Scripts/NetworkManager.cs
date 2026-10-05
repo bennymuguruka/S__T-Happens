@@ -16,6 +16,7 @@ public class NetworkManager : MonoBehaviour
     public string stateMessage;
     private string sessionToken = "";
     public event Action<SessionSnapshot> SessionRestored;
+    public event Action SessionReset;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -79,8 +80,7 @@ public class NetworkManager : MonoBehaviour
 
         socket.OnUnityThread("roomClosed", (response) =>
         {
-            socket.Disconnect();
-            SceneManager.LoadScene("Menu");
+            Debug.Log("Room closed");
         });
 
         socket.OnUnityThread("stateChanged", (response) =>
@@ -111,6 +111,12 @@ public class NetworkManager : MonoBehaviour
             SessionRestored?.Invoke(snapshot);
         });
 
+        socket.OnUnityThread("sessionReset", (response) =>
+        {
+            roomCode = "";
+            SessionReset?.Invoke();
+        });
+
     }
 
     public void CreateRoom() {
@@ -124,8 +130,7 @@ public class NetworkManager : MonoBehaviour
 
     public void StopGame()
     {
-        socket.Disconnect();
-        SceneManager.LoadScene("Menu");
+        socket.Emit("leaveRoom");
     }
 
     void Awake()
