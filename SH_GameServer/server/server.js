@@ -288,25 +288,32 @@ io.on('connection', (socket) => {
 
 
     socket.on("startGame", () => {
-        if (roomHosts[socket.id]) {
-            const roomCode = roomHosts[socket.id];
-            console.log("game start button clicked");
+        const roomCode = roomHosts[socket.id];
+        const room = rooms[roomCode];
 
-
-            if (rooms[roomCode].state === 'lobby' && (rooms[roomCode].players.reduce((sum, num) => sum + 1, 0)) >= 2) {
-                rooms[roomCode].state = 'playing';
-                console.log(rooms[roomCode].state);
-                io.to(roomCode).emit(
-                    'stateChanged', rooms[roomCode].state
-                );
-                console.log("Sending state Change");
-
-                return;
-            }
-
-            socket.emit('stateChanged', "Not enough players");
-
+        if(!room || room.hostID !== socket.id){
+            socket.emit("startGameError", "Only the room host can start")
+            return;
         }
+
+        if (room.state !== "lobby") {
+            socket.emit("startGameError", "The game has already started");
+            return;
+        }
+
+        const connectedPlayers = room.players.filter(player => {
+            const session = session.get(player.sessionToken);
+
+            return session && session.socketId && io.sockets.sockets.has(session.sessionId);
+        }).length;
+
+        if (connectedPlayers < 2){
+            socket.emit("startGameError", "at least two connected players are required.");
+            return;
+        }
+
+        room.state = "playing";
+        io.to(roomCode).emit("stateChanged", room.state);
     });
 
     socket.on("leaveRoom", ()=>{

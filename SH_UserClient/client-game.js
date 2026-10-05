@@ -42,6 +42,7 @@ socket.on('sessionReset', ()=>{
 
 //Join Page
     const form = document.querySelector("#joinForm");
+    document.getElementById("statusMessage").textContent = "";
     form.addEventListener('submit', (event)=> {
 
         event.preventDefault();
@@ -63,15 +64,15 @@ socket.on('sessionReset', ()=>{
         else if(error === "code"){
             document.getElementById("codeError").textContent = "Wrong room code";
         }
-    })
+        else{
+            document.getElementById('statusMessage').textContent = message;
+        }
+    });
 
     socket.on('playerAdded', ()=> {
         renderRoomState('lobby');
     });
 
-    socket.on('joinError', message => {
-        document.getElementById('statusMessage').textContent = message;
-    })
 
 //State Change
 socket.on('stateChanged', renderRoomState);

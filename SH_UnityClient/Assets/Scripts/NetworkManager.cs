@@ -10,13 +10,15 @@ using UnityEngine.SceneManagement;
 public class NetworkManager : MonoBehaviour
 {
     private SocketIOUnity socket;
-    private LobbyController lobbyController;
-    private string roomCode;
     public static NetworkManager instance;
     public string stateMessage;
     private string sessionToken = "";
     public event Action<SessionSnapshot> SessionRestored;
     public event Action SessionReset;
+    public event Action<string> RoomCreated;
+    public event Action<string> PlayerJoined;
+    public event Action<string> PlayerLeft;
+    public event Action<string> StateChanged;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -53,29 +55,22 @@ public class NetworkManager : MonoBehaviour
     void Events()
     {
         socket.OnUnityThread("roomCreated", (response) => {
-            roomCode = response.GetValue<string>();
-            Debug.Log("Room created: " + roomCode);
-
-            SceneManager.LoadScene("Lobby");
-
-            if (lobbyController != null)
-            {
-                lobbyController.SetRoomCode(roomCode);
-            }
+            string roomCode = response.GetValue<string>();
+            RoomCreated?.Invoke(roomCode);
         });
 
         socket.OnUnityThread("playerJoined", (response) =>
         {
             Debug.Log("player list recevied");
             string player = response.GetValue<string>();
-            lobbyController.AddPlayer(player);
+            PlayerJoined?.Invoke(player);
         });
 
         socket.OnUnityThread("playerLeft", (response) =>
         {
             string player = response.GetValue<string>();
             Debug.Log($"player: {player} will be removed");
-            lobbyController.RemovePlayer(player);
+            PlayerLeft?.Invoke(player);
         });
 
         socket.OnUnityThread("roomClosed", (response) =>
@@ -86,17 +81,7 @@ public class NetworkManager : MonoBehaviour
         socket.OnUnityThread("stateChanged", (response) =>
         {
             string state = response.GetValue<string>();
-
-            if (state == "playing")
-            {
-                SceneManager.LoadScene("Game Scene");
-                Debug.Log("On to Game Screen");
-            }
-            else
-            {
-                stateMessage = state;
-                Debug.Log(stateMessage);
-            }
+            StateChanged?.Invoke(state);
         });
 
         socket.OnUnityThread("sessionReady", response =>
@@ -113,8 +98,13 @@ public class NetworkManager : MonoBehaviour
 
         socket.OnUnityThread("sessionReset", (response) =>
         {
-            roomCode = "";
             SessionReset?.Invoke();
+        });
+
+        socket.OnUnityThread("startGameError", (response) =>
+        {
+            string message = response.GetValue<string>();
+            Debug.LogWarning(message);
         });
 
     }
@@ -143,20 +133,6 @@ public class NetworkManager : MonoBehaviour
         instance = this;
         DontDestroyOnLoad(gameObject);
     }
-
-    public void RegisterLobbyController(LobbyController ui)
-    {
-        Debug.Log("Lobby registered");
-        lobbyController = ui;
-
-        if (!string.IsNullOrEmpty(roomCode))
-        {
-            Debug.Log("Updating Ui with code: "+roomCode);
-            lobbyController.SetRoomCode(roomCode);
-        }
-
-    }
-
 
     // Update is called once per frame
     void Update()

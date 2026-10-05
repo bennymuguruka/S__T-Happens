@@ -21,8 +21,6 @@ public class LobbyController : MonoBehaviour
     {
         var network = NetworkManager.instance;
 
-        network.RegisterLobbyController(this);
-
         sessionController = network.GetComponent<SessionController>();
         sessionController.SessionChanged += RefreshLobby;
 
