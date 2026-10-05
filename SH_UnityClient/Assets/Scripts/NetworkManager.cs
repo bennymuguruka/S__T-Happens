@@ -19,6 +19,7 @@ public class NetworkManager : MonoBehaviour
     public event Action<string> PlayerJoined;
     public event Action<string> PlayerLeft;
     public event Action<string> StateChanged;
+    public bool IsSessionReady {  get; private set; }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -47,10 +48,20 @@ public class NetworkManager : MonoBehaviour
 
         socket.OnConnected += (sender, e) =>
         {
+            IsSessionReady = false;
             Debug.Log("Connected");
             socket.Emit("registerSession", sessionToken);
         };
+
+        socket.OnDisconnected += (sender, e) =>
+        {
+            UnityThread.executeInUpdate(() =>
+            {
+                SetSessionReady(false);
+            });
+        };
     }
+
 
     void Events()
     {
@@ -85,8 +96,9 @@ public class NetworkManager : MonoBehaviour
         });
 
         socket.OnUnityThread("sessionReady", response =>
-        {
+        {  
             sessionToken = response.GetValue<string>();
+            SetSessionReady(true);
             Debug.Log("Session Ready");
         });
 
@@ -107,20 +119,62 @@ public class NetworkManager : MonoBehaviour
             Debug.LogWarning(message);
         });
 
+        socket.OnUnityThread("sessionError", (response) =>
+        {
+            string message = response.GetValue<string>();
+            Debug.LogWarning(message);
+        });
+
     }
 
     public void CreateRoom() {
-        socket.Emit("createRoom");
+        if (!CanSendRoomRequest())
+        {
+            return;
+        }
+        socket.Emit("creteRoom");
     }
 
     public void StartGame()
     {
+        if (!CanSendRoomRequest())
+        {
+            return;
+        }
         socket.Emit("startGame");
     }
 
     public void StopGame()
     {
+        if (!CanSendRoomRequest())
+        {
+            return;
+        }
         socket.Emit("leaveRoom");
+    }
+
+    public event Action<bool> ConnectionReadyChanged;
+
+    private void SetSessionReady(bool ready)
+    {
+        if(IsSessionReady == ready)
+        {
+            return;
+        }
+
+        IsSessionReady = ready;
+        ConnectionReadyChanged?.Invoke(ready);
+    }
+
+    private bool CanSendRoomRequest()
+    {
+        if (IsSessionReady && socket != null && socket.Connected)
+        {
+            return true;
+        }
+
+        Debug.LogWarning("Waiting for the server connection");
+        return false;
     }
 
     void Awake()

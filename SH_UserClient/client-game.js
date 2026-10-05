@@ -10,19 +10,46 @@ if(roomCodeFromUrl){
 //Reconnect Handling
 let sessionReady = false;
 
+const connectionStatus = document.getElementById("connectionStatus");
+const joinButton = document.getElementById("joinButton");
+
 socket.on('connect', ()=> {
     sessionReady = false;
+    joinButton.disabled = true;
+    connectionStatus.textContent = "Restoring session...";
+
     socket.emit('registerSession', sessionStorage.getItem("sessionToken"));
 });
 
 socket.on('sessionReady', token=> {
     sessionStorage.setItem('sessionToken', token);
+
     sessionReady = true;
-})
+    joinButton.disabled = false;
+    connectionStatus.textContent = "";
+});
 
 socket.on('disconnect', ()=>{
     sessionReady = false;
-})
+    joinButton.disabled = true;
+
+    if (reason === "io server disconnect" || reason === "io client disconnect") {
+        connectionStatus.textContent = "Disconnected. Refresh to reconnect."
+    }
+    else{
+        connectionStatus.textContent = "Connection lost. Reconnecting...";
+    }
+});
+
+socket.on("connectError", () =>{
+    sessionReady = false;
+    joinButton.disabled = true;
+    connectionStatus.textContent = "Cannot reach the server. Retrying...";
+});
+
+socket.on("sessionError", message =>{
+    document.getElementById("statusMessage").textContent = message;
+});
 
 socket.on('sessionRestored', room =>{
     console.log('Session restored:', room);
@@ -31,14 +58,14 @@ socket.on('sessionRestored', room =>{
 
 socket.on('roomClosed', () => {
     renderRoomState('closed');
-})
+});
 
 socket.on('sessionReset', ()=>{
     document.getElementById("Join").hidden = false;
     document.getElementById("statusMessage").textContent = "";
     document.getElementById("codeError").textContent = "";
     document.getElementById("usernameError").textContent = "";
-})
+});
 
 //Join Page
     const form = document.querySelector("#joinForm");
@@ -55,7 +82,7 @@ socket.on('sessionReset', ()=>{
      const RoomCode = document.getElementById("roomCode").value;
     const username = document.getElementById("Username").value;
         socket.emit('join room', RoomCode, username);
-    })
+    });
 
     socket.on('joinError', error =>{
         if (error === "username") {

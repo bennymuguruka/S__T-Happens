@@ -6,6 +6,9 @@
     <script src="client-game.js" defer></script>
 </head>
 <body>
+
+<p id="connectionStatus" role="status">Connecting...</p>
+
 <section id="Join">
     <form id="joinForm">
   <label for="roomCode">Room Code:</label><br>
@@ -14,7 +17,7 @@
   <label for="Username">Username:</label><br>
   <input type="text" id="Username" name="Username"><br>
   <p id="usernameError"></p>
-  <button type="submit">Join Game</button>
+  <button id="joinButton" type="submit" disabled>Join Game</button>
     </form>
 </section>
 
