@@ -10,6 +10,8 @@
   "author": "bennymugruka",
   "license": "ISC",
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.2",
     "express": "^5.2.1",
     "socket.io": "^4.8.3"
   }

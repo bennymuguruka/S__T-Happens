@@ -104,6 +104,7 @@ public class SessionController : MonoBehaviour
         }
 
         CurrentSession.state = state;
+        ApplySessionState();
     }
 
     private void ApplySessionState()
@@ -118,7 +119,7 @@ public class SessionController : MonoBehaviour
         switch (CurrentSession.state)
         {
             case "lobby":
-                targetScene = "lobby";
+                targetScene = "Lobby";
                 break;
             case "playing":
                 targetScene = "Game Scene";

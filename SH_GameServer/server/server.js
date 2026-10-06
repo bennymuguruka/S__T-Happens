@@ -2,7 +2,7 @@ const express = require('express');
 var app = express();
 const server = require('http').createServer(app);
 const io = require('socket.io')(server, { cors: { origin: '*' } });
-const { generateRoomCode, rooms, roomHosts, findRoomByHost } = require('./rooms');
+const { generateRoomCode, rooms, roomHosts, Room} = require('./rooms');
 const crypto = require('crypto');
 
 const sessions = new Map();
@@ -68,13 +68,11 @@ io.on('connection', (socket) => {
 
         if (!(Object.keys(roomHosts).includes(socket.id))) {
             const roomCode = generateRoomCode();
-            rooms[roomCode] = {
-                hostID: socket.id,
-                hostSessionToken: sessionToken,
-                players: [],
-                state: 'lobby'
 
-            };
+            const room = new Room(roomCode, sessionToken);
+            rooms[roomCode] = room;
+
+            room.hostID = socket.id;
 
             session.roomCode = roomCode;
             session.role = "host";
@@ -105,44 +103,23 @@ io.on('connection', (socket) => {
             socket.emit('sessionError', "Already in a room");
             return;
         }
-        if (!room) {
+        
+        if(!room){
             socket.emit('joinError', "code");
             return;
-        };
-
-        if (room.state !== 'lobby') {
-            socket.emit('joinError', 'This game has already started.');
+        }
+        let player;
+        try{
+            player = room.addPlayer({
+                PlayerID: socket.id,
+                sessionToken,
+                username
+            });
+        }
+        catch(err){
+            socket.emit("joinError", err.message);
             return;
         }
-
-        if(typeof username !== "string"){
-            socket.emit("joinError", 'Enter a valid username.');
-            return;
-        }
-
-        username = username.trim();
-
-        if(username.length < 1 || username.length> 20){
-            socket.emit('joinError', 'Username must be between 1 and 20 characters.');
-            return;
-        }
-
-        if ((room.players.some((player) => player.PlayerID === socket.id))) {
-
-            console.log("Connection already exists");
-            return;
-        }
-        else if ((room.players.some((player) => player.username === username))) {
-            socket.emit('joinError', "username");
-            return;
-        }
-
-        room.players.push({
-            PlayerID: socket.id,
-            sessionToken,
-            username,
-            score: 0
-        });
 
         session.roomCode = roomCode;
         session.role = "player";
@@ -150,11 +127,8 @@ io.on('connection', (socket) => {
         socket.join(roomCode);
 
         console.log(
-            "Sending player:",
-            room.players.filter(player => player.PlayerID == socket.id).map(player => player.username)
+            "Sending player:", player.username
         );
-
-        const player = room.players.find(p => p.PlayerID === socket.id)
 
         io.to(room.hostID).emit(
             'playerJoined',
@@ -273,9 +247,7 @@ io.on('connection', (socket) => {
                 
             }
             else if (room && session.role == "player") {
-                const player = room.players.find(p => p.sessionToken === token);
-
-                room.players = room.players.filter(p => p.sessionToken !== token);
+                const player = room.removePlayer(token);
 
                 if (player) {
                     io.to(roomCode).emit('playerLeft', player.username);
@@ -296,23 +268,20 @@ io.on('connection', (socket) => {
             return;
         }
 
-        if (room.state !== "lobby") {
-            socket.emit("startGameError", "The game has already started");
-            return;
-        }
-
         const connectedPlayers = room.players.filter(player => {
-            const session = session.get(player.sessionToken);
+            const session = sessions.get(player.sessionToken);
 
-            return session && session.socketId && io.sockets.sockets.has(session.sessionId);
+            return session && session.socketId && io.sockets.sockets.has(session.socketId);
         }).length;
-
-        if (connectedPlayers < 2){
-            socket.emit("startGameError", "at least two connected players are required.");
+        
+        
+        try {
+            room.startGame(connectedPlayers);
+        } catch (err) {
+            socket.emit("startGameError", err.message);
             return;
         }
 
-        room.state = "playing";
         io.to(roomCode).emit("stateChanged", room.state);
     });
 
@@ -337,19 +306,12 @@ io.on('connection', (socket) => {
             socket.leave(roomCode);
         }
 
-        if (room && session.role === "player") {
-            const player = room.players.find(
-                p => p.sessionToken === token
-            );
+        if(room && session.role === "player"){
+        const player = room.removePlayer(token);
 
-            room.players = room.players.filter(
-                p => p.sessionToken !== token
-            );
-
-            if (player) {
-                io.to(roomCode).emit("playerLeft", player.username);
-            }
-        }
+        if (!(player === null)) {
+            io.to(roomCode).emit("playerLeft", player.username);
+        }}
 
         clearRoomSession(session);
         socket.emit("sessionReset");

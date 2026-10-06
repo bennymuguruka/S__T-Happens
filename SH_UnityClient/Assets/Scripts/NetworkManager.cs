@@ -132,7 +132,7 @@ public class NetworkManager : MonoBehaviour
         {
             return;
         }
-        socket.Emit("creteRoom");
+        socket.Emit("createRoom");
     }
 
     public void StartGame()
