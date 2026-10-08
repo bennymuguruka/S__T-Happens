@@ -132,3 +132,25 @@ function renderRoomState(state) {
             break;
     }
 }
+
+//Game Screen
+const gameScreen = document.getElementById("gameScreen");
+function renderCards(cards){
+    gameScreen.replaceChildren(); 
+    cards.forEach(card => {
+        const cardArea = document.createElement("div");
+        const text = document.createElement("p");
+        const index = document.createElement("p");
+
+        text.textContent = card.scenarioText;
+        index.textContent = card.miseryIndex;
+
+        cardArea.append(text);
+        cardArea.append(index);
+
+        gameScreen.append(cardArea);
+    });
+}
+socket.on("playerCards", cards =>{
+    renderCards(cards);
+})

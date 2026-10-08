@@ -19,7 +19,8 @@ public class NetworkManager : MonoBehaviour
     public event Action<string> PlayerJoined;
     public event Action<string> PlayerLeft;
     public event Action<string> StateChanged;
-    public bool IsSessionReady {  get; private set; }
+    public bool IsSessionReady {get; private set;}
+    public event Action<RoundSnapshot> RoundStarted;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -123,6 +124,12 @@ public class NetworkManager : MonoBehaviour
         {
             string message = response.GetValue<string>();
             Debug.LogWarning(message);
+        });
+
+        socket.OnUnityThread("roundStarted", (response) =>
+        {
+            var snapshot = response.GetValue<RoundSnapshot>();
+            RoundStarted?.Invoke(snapshot);
         });
 
     }

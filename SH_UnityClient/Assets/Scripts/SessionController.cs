@@ -8,6 +8,7 @@ public class SessionController : MonoBehaviour
     [SerializeField] private NetworkManager networkManager;
     public SessionSnapshot CurrentSession {  get; private set; }
     public event Action<SessionSnapshot> SessionChanged;
+    public RoundSnapshot CurrentRound { get; private set; }
 
     private void OnEnable()
     {
@@ -17,6 +18,7 @@ public class SessionController : MonoBehaviour
         networkManager.PlayerJoined += HandlePlayerJoined;
         networkManager.PlayerLeft += HandlePlayerLeft;
         networkManager.StateChanged += HandleStateChanged;
+        networkManager.RoundStarted += HandleRoundStarted;
     }
 
     private void OnDisable()
@@ -27,11 +29,13 @@ public class SessionController : MonoBehaviour
         networkManager.PlayerJoined -= HandlePlayerJoined;
         networkManager.PlayerLeft -= HandlePlayerLeft;
         networkManager.StateChanged -= HandleStateChanged;
+        networkManager.RoundStarted -= HandleRoundStarted;
     }
 
     private void HandleSessionReset()
     {
         CurrentSession = null;
+        CurrentRound = null;
 
         if(SceneManager.GetActiveScene().name != "Menu")
         {
@@ -137,6 +141,11 @@ public class SessionController : MonoBehaviour
         {
             SessionChanged?.Invoke(CurrentSession);
         }
+    }
+
+    private void HandleRoundStarted(RoundSnapshot snapshot)
+    {
+        CurrentRound = snapshot;
     }
 
 

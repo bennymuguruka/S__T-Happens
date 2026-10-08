@@ -4,6 +4,8 @@ const server = require('http').createServer(app);
 const io = require('socket.io')(server, { cors: { origin: '*' } });
 const { generateRoomCode, rooms, roomHosts, Room} = require('./rooms');
 const crypto = require('crypto');
+const {getCards} = require("./card-repository");
+const {Deck} = require("./decks");
 
 const sessions = new Map();
 
@@ -259,7 +261,7 @@ io.on('connection', (socket) => {
     })
 
 
-    socket.on("startGame", () => {
+    socket.on("startGame", async () => {
         const roomCode = roomHosts[socket.id];
         const room = rooms[roomCode];
 
@@ -268,21 +270,64 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const connectedPlayers = room.players.filter(player => {
+        if (room.isPreparing) {
+            socket.emit("startGameError", "Game setup is already running");
+            return;
+        }
+
+        const countConnectedPlayers = () => room.players.filter(player => {
             const session = sessions.get(player.sessionToken);
 
             return session && session.socketId && io.sockets.sockets.has(session.socketId);
         }).length;
-        
-        
+
         try {
-            room.startGame(connectedPlayers);
+            room.validateStart(countConnectedPlayers());
         } catch (err) {
             socket.emit("startGameError", err.message);
             return;
         }
 
-        io.to(roomCode).emit("stateChanged", room.state);
+        room.isPreparing = true;
+
+        try {
+            const cards = await getCards();
+
+            if (rooms[roomCode] !== room || room.hostID !== socket.id || !socket.connected) {
+                return;
+            }
+
+            const connectedPlayers = countConnectedPlayers();
+            room.validateStart(connectedPlayers);
+            const deck = new Deck(cards);
+
+            deck.shuffle();
+            room.dealStartingCards(deck);
+            room.deck = deck;
+            room.startGame(connectedPlayers);
+            room.startRound();
+
+            io.to(roomCode).emit("stateChanged", room.state);
+
+            const scenario = room.currentRound.scenario_card;
+
+            io.to(room.hostID).emit("roundStarted", {
+                cardID: scenario.cardID,
+                scenarioText: scenario.scenarioText
+            });
+            
+            room.players.forEach(player => {
+                io.to(player.PlayerID).emit("playerCards", player.scale)
+            });
+
+        } catch (err) {
+            socket.emit("startGameError", err.message);
+            return;
+        } finally {
+            room.isPreparing = false;
+        }
+
+
     });
 
     socket.on("leaveRoom", ()=>{
