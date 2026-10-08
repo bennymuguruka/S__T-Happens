@@ -11,6 +11,11 @@ public class PlayerItem : MonoBehaviour
 
     public void Setup(string username)
     {
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            Debug.LogWarning("Cannot display a player with an empty username.");
+            return;
+        }
         usernameText.text = username;
         initialText.text = username[0].ToString().ToUpper();
 

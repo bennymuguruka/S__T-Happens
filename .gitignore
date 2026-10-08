@@ -117,3 +117,6 @@ InitTestScene*.unity*
 /SH_UnityClient/[Uu]ser[Ss]ettings/
 /SH_UnityClient/[Bb]uild/
 /SH_UnityClient/[Bb]uilds/
+
+#Enviroment variables
+.env

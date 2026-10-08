@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test</title>
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <script src="client-game.js" defer></script>
+</head>
+<body>
+
+<p id="connectionStatus" role="status">Connecting...</p>
+
+<section id="Join">
+    <form id="joinForm">
+  <label for="roomCode">Room Code:</label><br>
+  <input type="text" id="roomCode" name="roomCode"><br>
+  <p id="codeError"></p>
+  <label for="Username">Username:</label><br>
+  <input type="text" id="Username" name="Username"><br>
+  <p id="usernameError"></p>
+  <button id="joinButton" type="submit" disabled>Join Game</button>
+    </form>
+</section>
+
+<p id="statusMessage" role="status"></p>
+
+</body>
+</html>
