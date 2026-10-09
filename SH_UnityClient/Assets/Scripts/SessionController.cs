@@ -9,6 +9,7 @@ public class SessionController : MonoBehaviour
     public SessionSnapshot CurrentSession {  get; private set; }
     public event Action<SessionSnapshot> SessionChanged;
     public RoundSnapshot CurrentRound { get; private set; }
+    public event Action<RoundSnapshot> RoundChanged;
 
     private void OnEnable()
     {
@@ -146,6 +147,7 @@ public class SessionController : MonoBehaviour
     private void HandleRoundStarted(RoundSnapshot snapshot)
     {
         CurrentRound = snapshot;
+        RoundChanged?.Invoke(CurrentRound);
     }
 
 

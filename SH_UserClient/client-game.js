@@ -29,7 +29,7 @@ socket.on('sessionReady', token=> {
     connectionStatus.textContent = "";
 });
 
-socket.on('disconnect', ()=>{
+socket.on('disconnect', reason =>{
     sessionReady = false;
     joinButton.disabled = true;
 
@@ -41,7 +41,7 @@ socket.on('disconnect', ()=>{
     }
 });
 
-socket.on("connectError", () =>{
+socket.on("connect_error", () =>{
     sessionReady = false;
     joinButton.disabled = true;
     connectionStatus.textContent = "Cannot reach the server. Retrying...";
@@ -61,10 +61,15 @@ socket.on('roomClosed', () => {
 });
 
 socket.on('sessionReset', ()=>{
+    gameScreen.hidden = true;
+    gameScreen.replaceChildren();
     document.getElementById("Join").hidden = false;
     document.getElementById("statusMessage").textContent = "";
     document.getElementById("codeError").textContent = "";
     document.getElementById("usernameError").textContent = "";
+    document.getElementById("submittedScreen").hidden = true;
+    submissionPending = false;
+    hasSubmitted = false;
 });
 
 //Join Page
@@ -92,7 +97,7 @@ socket.on('sessionReset', ()=>{
             document.getElementById("codeError").textContent = "Wrong room code";
         }
         else{
-            document.getElementById('statusMessage').textContent = message;
+            document.getElementById('statusMessage').textContent = error;
         }
     });
 
@@ -115,6 +120,8 @@ function renderRoomState(state) {
             break;
         case "playing":
             joinSection.hidden = true;
+            gameScreen.hidden = hasSubmitted;
+            document.getElementById("submittedScreen").hidden = !hasSubmitted;
             status.textContent = "Playing game"
             break;
         case "finished":
@@ -122,6 +129,11 @@ function renderRoomState(state) {
             status.textContent = 'Game finished.';
             break;
           case 'closed':
+            gameScreen.hidden = true;
+            gameScreen.replaceChildren();
+            document.getElementById("submittedScreen").hidden = true;
+            submissionPending = false;
+            hasSubmitted = false;
             joinSection.hidden = false;
             status.textContent = 'The room has closed.';
             document.getElementById('roomCode').value = '';
@@ -137,19 +149,64 @@ function renderRoomState(state) {
 const gameScreen = document.getElementById("gameScreen");
 function renderCards(cards){
     gameScreen.replaceChildren(); 
-    cards.forEach(card => {
+    cards.forEach((card, placementIndex) => {
+
+        const placementButton = document.createElement("button");
+        placementButton.textContent = "Place here";
+
+        placementButton.addEventListener("click", () => {submitPlacement(placementIndex)})
+
         const cardArea = document.createElement("div");
         const text = document.createElement("p");
         const index = document.createElement("p");
-
+     
         text.textContent = card.scenarioText;
         index.textContent = card.miseryIndex;
 
-        cardArea.append(text);
-        cardArea.append(index);
+        cardArea.append(text, index);
+        gameScreen.append(placementButton, cardArea);
 
-        gameScreen.append(cardArea);
     });
+
+    const finalButton = document.createElement("button");
+    finalButton.textContent = "Place here";
+
+    finalButton.addEventListener("click", () => {submitPlacement(cards.length)});
+
+    gameScreen.append(finalButton);
+}
+
+let submissionPending = false;
+let hasSubmitted = false;
+
+function setButtonsDisabled(isDisabled) {
+    gameScreen.querySelectorAll("button").forEach(button =>{
+        button.disabled = isDisabled
+    });
+}
+
+function submitPlacement(position) {
+    if (submissionPending || !sessionReady || hasSubmitted) {
+            return;
+        }
+
+    submissionPending = true;
+    setButtonsDisabled(true);
+    socket.emit("submitPlacement",position, response =>{
+        submissionPending = false;
+
+        if (response.success) {
+            document.getElementById("statusMessage").textContent = "Answer Submitted";
+            hasSubmitted = true;
+            gameScreen.hidden = true;
+            document.getElementById("submittedScreen").hidden = false;
+        }
+        else{
+            setButtonsDisabled(false);
+            document.getElementById("statusMessage").textContent = response.message;
+            hasSubmitted = false;
+        }
+    })
 }
 socket.on("playerCards", cards =>{
     renderCards(cards);

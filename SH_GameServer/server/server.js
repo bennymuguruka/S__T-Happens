@@ -6,6 +6,7 @@ const { generateRoomCode, rooms, roomHosts, Room} = require('./rooms');
 const crypto = require('crypto');
 const {getCards} = require("./card-repository");
 const {Deck} = require("./decks");
+const { ifError } = require('assert');
 
 const sessions = new Map();
 
@@ -69,7 +70,10 @@ io.on('connection', (socket) => {
 
 
         if (!(Object.keys(roomHosts).includes(socket.id))) {
-            const roomCode = generateRoomCode();
+            let roomCode;
+            do {
+                roomCode = generateRoomCode();
+            } while (Object.prototype.hasOwnProperty.call(rooms, roomCode));
 
             const room = new Room(roomCode, sessionToken);
             rooms[roomCode] = room;
@@ -154,7 +158,7 @@ io.on('connection', (socket) => {
             token = crypto.randomBytes(32).toString('hex');
 
             session = {
-                socketID: socket.id,
+                socketId: socket.id,
                 roomCode: null,
                 role: null
             };
@@ -216,8 +220,24 @@ io.on('connection', (socket) => {
                 roomCode: session.roomCode,
                 role: session.role,
                 state: restoredRoom.state,
+                hasSubmitted: room.currentRound.submissions.has(socket.data.sessionToken),
                 players: restoredRoom.players.map(player => ({ username: player.username, score: player.score }))
-            })
+            });
+
+            if (session.role === "player") {
+                const player = restoredRoom.players.find(p => p.sessionToken === token);
+                if (player) {
+                    socket.emit("playerCards", player.scale);
+                }
+            }
+
+            if (session.role === "host" && restoredRoom.currentRound) {
+                const scenario = restoredRoom.currentRound.scenario_card;
+                socket.emit("roundStarted", {
+                    cardID: scenario.cardID,
+                    scenarioText: scenario.scenarioText
+                });
+            }
         }
         else{
             socket.emit('sessionReset');
@@ -361,6 +381,46 @@ io.on('connection', (socket) => {
         clearRoomSession(session);
         socket.emit("sessionReset");
     })
+
+    socket.on("submitPlacement", (position, acknowledge)=> {
+        
+        if (typeof(acknowledge) != "function") {
+            return;
+        }
+
+        try
+        {
+            const token = socket.data.sessionToken;
+            const session = sessions.get(token);
+
+            if (!session || session.socketId !== socket.id || session.role !== "player") {
+                throw new Error("Player is not in this room");
+            }
+
+            const room = rooms[session.roomCode];
+
+            if (!room || room.state !== "playing" || !room.currentRound) {
+                throw new Error("No active round");
+            }
+
+            const player = room.players.find(player => player.sessionToken === token);
+
+            if (!player) {
+                throw new Error("Player not in this room");
+            }
+
+            room.currentRound.submit(player, position);
+            acknowledge({success: true});
+        } 
+        catch (error) 
+        {
+            acknowledge({
+                success: false,
+                message: error.message
+            }) ;           
+        }
+
+    });
 
     console.log("Connection established")
 
