@@ -220,7 +220,8 @@ io.on('connection', (socket) => {
                 roomCode: session.roomCode,
                 role: session.role,
                 state: restoredRoom.state,
-                hasSubmitted: room.currentRound.submissions.has(socket.data.sessionToken),
+                hasSubmitted: session.role === "player" &&
+                    (restoredRoom.currentRound?.submissions.has(token) ?? false),
                 players: restoredRoom.players.map(player => ({ username: player.username, score: player.score }))
             });
 

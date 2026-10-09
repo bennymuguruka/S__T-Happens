@@ -53,6 +53,8 @@ socket.on("sessionError", message =>{
 
 socket.on('sessionRestored', room =>{
     console.log('Session restored:', room);
+    hasSubmitted = room.hasSubmitted;
+    submissionPending = false;
     renderRoomState(room.state);
 });
 
@@ -192,7 +194,14 @@ function submitPlacement(position) {
 
     submissionPending = true;
     setButtonsDisabled(true);
-    socket.emit("submitPlacement",position, response =>{
+    socket.timeout(5000).emit("submitPlacement", position, (error, response) => {
+        if (error) {
+            document.getElementById("statusMessage").textContent =
+                "Checking whether your answer was received...";
+            // Restore the server's submission status before allowing a retry.
+            socket.emit("registerSession", sessionStorage.getItem("sessionToken"));
+            return;
+        }
         submissionPending = false;
 
         if (response.success) {
@@ -210,4 +219,5 @@ function submitPlacement(position) {
 }
 socket.on("playerCards", cards =>{
     renderCards(cards);
+    setButtonsDisabled(hasSubmitted || submissionPending);
 })
