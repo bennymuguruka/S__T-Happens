@@ -1,5 +1,5 @@
 class Round{
-    constructor(scenario_card,){
+    constructor(scenario_card){
         this.scenario_card = scenario_card;
         this.submissions = new Map();
         this.isLocked = false;
@@ -20,6 +20,10 @@ class Round{
 
     lock(){
         this.isLocked = true;
+    }
+
+    allPlayerSubmitted(players){
+        return players.every(player => this.submissions.has(player.sessionToken))
     }
 }
 

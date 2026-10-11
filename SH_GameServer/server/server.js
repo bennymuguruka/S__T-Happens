@@ -412,6 +412,16 @@ io.on('connection', (socket) => {
 
             room.currentRound.submit(player, position);
             acknowledge({success: true});
+
+            if(room.currentRound.allPlayerSubmitted(room.players)){
+                room.currentRound.lock();
+
+                socket.emit("roundRevealed", {
+                    cardID: [room.currentRound.scenario_card.cardID],
+                    miseryIndex: [room.currentRound.scenario_card.miseryIndex]
+                })
+            }
+
         } 
         catch (error) 
         {

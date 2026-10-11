@@ -1122,7 +1122,7 @@ RectTransform:
   m_GameObject: {fileID: 1570151507}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1.4255259, y: 1.4255259, z: 1.4255259}
+  m_LocalScale: {x: 1.1029721, y: 1.1029721, z: 1.1029721}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1241990819}
@@ -1144,7 +1144,7 @@ GameObject:
   - component: {fileID: 1707119506}
   - component: {fileID: 1707119505}
   m_Layer: 5
-  m_Name: Image
+  m_Name: Logo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1159,7 +1159,7 @@ RectTransform:
   m_GameObject: {fileID: 1707119503}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 9.051704, y: 2.9183044, z: 2.9183044}
+  m_LocalScale: {x: 10.01209, y: 3.2279365, z: 3.2279365}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1241990819}
@@ -1189,7 +1189,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: cd9a51ce054fca84cad06d9e95b9e075, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 36a5f17fef586cc4c8ef2e823d02898a, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
