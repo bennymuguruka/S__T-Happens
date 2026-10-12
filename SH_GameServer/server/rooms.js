@@ -1,5 +1,6 @@
 let rooms = {};
 let roomHosts = {};
+const {Round} = require("./round");
 
 const crypto = require('crypto');
 
@@ -13,6 +14,9 @@ class Room{
         this.hostSessionToken = hostSessionToken;
         this.players = [];
         this.state = "lobby";
+        this.isPreparing = false;
+        this.deck = null;
+        this.currentRound = null;
     }
 
     addPlayer(player){
@@ -41,6 +45,7 @@ class Room{
             PlayerID: player.PlayerID,
             sessionToken: player.sessionToken,
             username,
+            scale: [],
             score: 0
 
         }
@@ -59,7 +64,7 @@ class Room{
         return playerLeft;
     }
 
-    startGame(connectedPlayers){
+    validateStart(connectedPlayers){
         if (this.state !== "lobby") {
             throw new Error("Game already started");
         }
@@ -68,7 +73,44 @@ class Room{
             throw new Error("Not enough players");
         }
 
+    }
+
+    startGame(connectedPlayers){
+        this.validateStart(connectedPlayers);
         this.state = "playing";
+    }
+
+    dealStartingCards(deck){
+        if (this.state != "lobby") {
+            throw new Error("Game already started");
+        }
+
+        if (this.players.some(player => player.scale.length !== 0)) {
+            throw new Error("Starting cards have been dealt"); 
+        }
+
+        if (deck.cards.length < (2 * this.players.length) + 1) {
+            throw new Error("Not enough cards")
+        }
+
+        this.players.forEach(player => {
+            for (let i = 0; i < 2; i++) {
+                player.scale.push(deck.draw());
+            }
+
+            player.scale.sort((a,b) => a.miseryIndex - b.miseryIndex);
+        });
+    }
+
+    startRound(){
+        if (this.state !== "playing") {
+            throw new Error("Game hasn't started");
+        }
+
+        let card = this.deck.draw();
+
+        const round = new Round(card);
+        this.currentRound = round;
     }
 }
 

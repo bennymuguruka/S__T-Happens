@@ -8,6 +8,10 @@ public class SessionController : MonoBehaviour
     [SerializeField] private NetworkManager networkManager;
     public SessionSnapshot CurrentSession {  get; private set; }
     public event Action<SessionSnapshot> SessionChanged;
+    public RoundSnapshot CurrentRound { get; private set; }
+    public event Action<RoundSnapshot> RoundChanged;
+    public RoundRevealSnapshot CurrentReveal { get; private set; }
+    public event Action<RoundRevealSnapshot> RoundRevealChanged;
 
     private void OnEnable()
     {
@@ -17,6 +21,8 @@ public class SessionController : MonoBehaviour
         networkManager.PlayerJoined += HandlePlayerJoined;
         networkManager.PlayerLeft += HandlePlayerLeft;
         networkManager.StateChanged += HandleStateChanged;
+        networkManager.RoundStarted += HandleRoundStarted;
+        networkManager.RoundRevealed += HandleRoundRevealChanged;
     }
 
     private void OnDisable()
@@ -27,11 +33,15 @@ public class SessionController : MonoBehaviour
         networkManager.PlayerJoined -= HandlePlayerJoined;
         networkManager.PlayerLeft -= HandlePlayerLeft;
         networkManager.StateChanged -= HandleStateChanged;
+        networkManager.RoundStarted -= HandleRoundStarted;
+        networkManager.RoundRevealed -= HandleRoundRevealChanged;
     }
 
     private void HandleSessionReset()
     {
         CurrentSession = null;
+        CurrentRound = null;
+        CurrentReveal = null;
 
         if(SceneManager.GetActiveScene().name != "Menu")
         {
@@ -137,6 +147,19 @@ public class SessionController : MonoBehaviour
         {
             SessionChanged?.Invoke(CurrentSession);
         }
+    }
+
+    private void HandleRoundStarted(RoundSnapshot snapshot)
+    {
+        CurrentReveal = null;
+        CurrentRound = snapshot;
+        RoundChanged?.Invoke(CurrentRound);
+    }
+
+    private void HandleRoundRevealChanged(RoundRevealSnapshot snapshot)
+    {
+        CurrentReveal = snapshot;
+        RoundRevealChanged?.Invoke(CurrentReveal);
     }
 
 
